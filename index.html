@@ -1,365 +1,454 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Simple Image Splitter (Dark Mode)</title>
-  <style>
-    body {
-      background-color: #333;
-      color: #f3f3f3;
-      font-family: Arial, sans-serif;
-      margin: 30px;
-      transition: background-color 0.3s, color 0.3s;
-    }
-    h2 {
-      color: #fafafa;
-    }
-    #controls {
-      margin-bottom: 20px;
-    }
-    #canvasWrapper {
-      position: relative;
-      display: inline-block;
-    }
-    #imageCanvas {
-      border: 1px solid #666;
-      background: #222;
-    }
-    .guide {
-      position: absolute;
-      background: rgba(0, 150, 255, 0.7);
-      cursor: pointer;
-      z-index: 10;
-    }
-    .guide.vertical { width: 3px; }
-    .guide.horizontal { height: 3px; }
-    #croppedPreviews {
-      margin-top: 30px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-    }
-    .cropSection {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #222;
-      border-radius: 10px;
-      padding: 10px;
-    }
-    .cropSection canvas {
-      border: 1px solid #666;
-      margin-bottom: 5px;
-      background: #111;
-    }
-    button, input[type="number"], input[type="file"] {
-      background: #444;
-      color: #fafafa;
-      border: 1px solid #888;
-      border-radius: 5px;
-      padding: 8px 12px;
-      margin: 3px 0;
-      font-size: 15px;
-      transition: background 0.2s, color 0.2s;
-    }
-    button:hover, input[type="number"]:focus, input[type="file"]:focus {
-      background: #222;
-      color: #fff;
-      outline: none;
-      border-color: #0af;
-    }
-    input[type="number"], input[type="file"] {
-      padding: 6px 8px;
-    }
-    #downloadAllBtn {
-      margin: 20px 0 0 0;
-      padding: 10px 20px;
-      font-size: 16px;
-      background: #0af;
-      color: #fff;
-      border: none;
-    }
-    #downloadAllBtn:hover {
-      background: #08c;
-    }
-  </style>
-  <!-- JSZip CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-</head>
-<body>
-  <h2>Simple Image Splitter</h2>
-  <div id="controls">
-    <input type="file" id="imgInput" accept="image/*"><br><br>
-    Vertical Guides: <input type="number" id="vGuides" min="0" max="10" value="2" style="width: 50px;">
-    Horizontal Guides: <input type="number" id="hGuides" min="0" max="10" value="2" style="width: 50px;">
-    <button id="setGuides">Set Guides</button>
-    <button id="splitBtn">Split & Preview</button>
-    <button id="downloadAllBtn" style="display:none;">Download All as ZIP</button>
-  </div>
-  <div id="canvasWrapper">
-    <canvas id="imageCanvas"></canvas>
-  </div>
-  <div id="croppedPreviews"></div>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Simple Image Splitter (Dark Mode)</title>
+        <style>
+            body {
+                background-color: #333;
+                color: #f3f3f3;
+                font-family: Arial, sans-serif;
+                margin: 30px;
+                transition: background-color 0.3s, color 0.3s;
+            }
+            h2 {
+                color: #fafafa;
+            }
+            #controls {
+                margin-bottom: 20px;
+            }
+            #canvasWrapper {
+                position: relative;
+                display: inline-block;
+            }
+            #imageCanvas {
+                border: 1px solid #666;
+                background: #222;
+            }
+            .guide {
+                position: absolute;
+                background: rgba(0, 150, 255, 0.7);
+                cursor: pointer;
+                z-index: 10;
+            }
+            .guide.vertical {
+                width: 3px;
+                cursor: ew-resize; /* East-West resize for vertical guides */
+            }
+            .guide.horizontal {
+                height: 3px;
+                cursor: ns-resize; /* North-South resize for horizontal guides */
+            }
+            #croppedPreviews {
+                margin-top: 30px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+            .cropSection {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background: #222;
+                border-radius: 10px;
+                padding: 10px;
+            }
+            .cropSection canvas {
+                border: 1px solid #666;
+                margin-bottom: 5px;
+                background: #111;
+            }
+            button,
+            input[type="number"],
+            input[type="file"] {
+                background: #444;
+                color: #fafafa;
+                border: 1px solid #888;
+                border-radius: 5px;
+                padding: 8px 12px;
+                margin: 3px 0;
+                font-size: 15px;
+                transition: background 0.2s, color 0.2s;
+            }
+            button:hover,
+            input[type="number"]:focus,
+            input[type="file"]:focus {
+                background: #222;
+                color: #fff;
+                outline: none;
+                border-color: #0af;
+            }
+            input[type="number"],
+            input[type="file"] {
+                padding: 6px 8px;
+            }
+            #downloadAllBtn {
+                margin: 20px 0 0 0;
+                padding: 10px 20px;
+                font-size: 16px;
+                background: #0af;
+                color: #fff;
+                border: none;
+            }
+            #downloadAllBtn:hover {
+                background: #08c;
+            }
+            #croppedPreviews button {
+                background: #0af;
+                padding-inline: 3rem;
+            }
+            button, input {
+                margin-block: 0.5rem;
+                margin-inline: 0.5rem;
+                padding: 0.5rem;
+            }
 
-  <script>
-    const imgInput = document.getElementById('imgInput');
-    const vGuidesInput = document.getElementById('vGuides');
-    const hGuidesInput = document.getElementById('hGuides');
-    const setGuidesBtn = document.getElementById('setGuides');
-    const splitBtn = document.getElementById('splitBtn');
-    const downloadAllBtn = document.getElementById('downloadAllBtn');
-    const canvas = document.getElementById('imageCanvas');
-    const ctx = canvas.getContext('2d');
-    const canvasWrapper = document.getElementById('canvasWrapper');
-    const croppedPreviews = document.getElementById('croppedPreviews');
+            /* Style for devices in portrait orientation */
+            @media (orientation: portrait) {
+                body {
+                    font-size: 2.5rem;
+                }
+                input[type="number"],
+                input[type="file"] {
+                    font-size: 2.5rem;
+                }
+                input[type="number"] {
+                    margin-right: 2.5rem;
+                    width: 80px !important;
 
-    let img = null;
-    let vGuides = [];
-    let hGuides = [];
-    let draggingGuide = null;
-    let dragOffset = 0;
-    let cropCanvases = [];
-
-    function draw() {
-      if (!img) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      ctx.save();
-      ctx.strokeStyle = 'rgba(0,150,255,0.7)';
-      ctx.lineWidth = 2;
-      vGuides.forEach(x => {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      });
-      hGuides.forEach(y => {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      });
-      ctx.restore();
-    }
-
-    function updateGuideDivs() {
-      Array.from(canvasWrapper.querySelectorAll('.guide')).forEach(g => g.remove());
-      vGuides.forEach((x, idx) => {
-        const div = document.createElement('div');
-        div.className = 'guide vertical';
-        div.style.left = (x-1) + 'px';
-        div.style.top = '0px';
-        div.style.height = canvas.height + 'px';
-        div.dataset.type = 'vertical';
-        div.dataset.idx = idx;
-        canvasWrapper.appendChild(div);
-      });
-      hGuides.forEach((y, idx) => {
-        const div = document.createElement('div');
-        div.className = 'guide horizontal';
-        div.style.top = (y-1) + 'px';
-        div.style.left = '0px';
-        div.style.width = canvas.width + 'px';
-        div.dataset.type = 'horizontal';
-        div.dataset.idx = idx;
-        canvasWrapper.appendChild(div);
-      });
-    }
-
-    function setGuides() {
-      let numV = parseInt(vGuidesInput.value) || 0;
-      let numH = parseInt(hGuidesInput.value) || 0;
-      vGuides = [];
-      hGuides = [];
-      for (let i = 1; i <= numV; i++) {
-        vGuides.push(Math.round(i * canvas.width / (numV + 1)));
-      }
-      for (let i = 1; i <= numH; i++) {
-        hGuides.push(Math.round(i * canvas.height / (numH + 1)));
-      }
-      updateGuideDivs();
-      draw();
-      croppedPreviews.innerHTML = '';
-      downloadAllBtn.style.display = 'none';
-    }
-
-    imgInput.addEventListener('change', function() {
-      const file = this.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        img = new window.Image();
-        img.onload = function() {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          setGuides();
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    setGuidesBtn.addEventListener('click', setGuides);
-
-    // Dragging logic for guides
-    canvasWrapper.addEventListener('mousedown', function(e) {
-      if (!img) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      let found = false;
-      vGuides.forEach((gx, idx) => {
-        if (Math.abs(gx - x) < 5 && !found) {
-          draggingGuide = {type: 'vertical', idx: idx};
-          dragOffset = gx - x;
-          found = true;
-        }
-      });
-      hGuides.forEach((gy, idx) => {
-        if (Math.abs(gy - y) < 5 && !found) {
-          draggingGuide = {type: 'horizontal', idx: idx};
-          dragOffset = gy - y;
-          found = true;
-        }
-      });
-    });
-
-    canvasWrapper.addEventListener('mousemove', function(e) {
-      if (!img || !draggingGuide) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      if (draggingGuide.type === 'vertical') {
-        let newX = x + dragOffset;
-        newX = Math.max(0, Math.min(canvas.width, newX));
-        vGuides[draggingGuide.idx] = newX;
-      } else {
-        let newY = y + dragOffset;
-        newY = Math.max(0, Math.min(canvas.height, newY));
-        hGuides[draggingGuide.idx] = newY;
-      }
-      updateGuideDivs();
-      draw();
-    });
-
-    window.addEventListener('mouseup', function() {
-      draggingGuide = null;
-    });
-
-    function splitAndPreview() {
-      if (!img) return;
-      croppedPreviews.innerHTML = '';
-      cropCanvases = [];
-      const xGuides = [0, ...vGuides.slice().sort((a,b)=>a-b), canvas.width];
-      const yGuides = [0, ...hGuides.slice().sort((a,b)=>a-b), canvas.height];
-      let count = 1;
-      for (let i = 0; i < yGuides.length-1; i++) {
-        for (let j = 0; j < xGuides.length-1; j++) {
-          const sx = xGuides[j], sy = yGuides[i];
-          const sw = xGuides[j+1] - xGuides[j], sh = yGuides[i+1] - yGuides[i];
-          const cropCanvas = document.createElement('canvas');
-          cropCanvas.width = sw;
-          cropCanvas.height = sh;
-          cropCanvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-          cropCanvases.push({canvas: cropCanvas, name: `crop_${count}.png`});
-          const btn = document.createElement('button');
-          btn.textContent = 'Download';
-          btn.onclick = function() {
-            const link = document.createElement('a');
-            link.download = `crop_${count}.png`;
-            link.href = cropCanvas.toDataURL('image/png');
-            link.click();
-          };
-          const section = document.createElement('div');
-          section.className = 'cropSection';
-          section.appendChild(cropCanvas);
-          section.appendChild(btn);
-          croppedPreviews.appendChild(section);
-          count++;
-        }
-      }
-      if (cropCanvases.length > 0) {
-        downloadAllBtn.style.display = '';
-      } else {
-        downloadAllBtn.style.display = 'none';
-      }
-    }
-
-    splitBtn.addEventListener('click', splitAndPreview);
-
-    downloadAllBtn.addEventListener('click', async function() {
-      if (!window.JSZip) {
-        alert('JSZip library not loaded!');
-        return;
-      }
-      const zip = new JSZip();
-      for (const crop of cropCanvases) {
-        const blob = await new Promise(resolve => crop.canvas.toBlob(resolve, 'image/png'));
-        zip.file(crop.name, blob);
-      }
-      zip.generateAsync({type:"blob"}).then(function(content) {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = 'cropped_images.zip';
-        link.click();
-      });
-    });
-    // --- Touch support for guides ---
-    canvasWrapper.addEventListener('touchstart', function(e) {
-      if (!img) return;
-      const rect = canvas.getBoundingClientRect();
-      // Use the first touch point only
-      const touch = e.touches[0];
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      let found = false;
-      vGuides.forEach((gx, idx) => {
-        if (Math.abs(gx - x) < 15 && !found) {
-          draggingGuide = {type: 'vertical', idx: idx};
-          dragOffset = gx - x;
-          found = true;
-        }
-      });
-      hGuides.forEach((gy, idx) => {
-        if (Math.abs(gy - y) < 15 && !found) {
-          draggingGuide = {type: 'horizontal', idx: idx};
-          dragOffset = gy - y;
-          found = true;
-        }
-      });
-      if (found) e.preventDefault(); // Prevent scrolling when touching a guide
-    });
-
-    canvasWrapper.addEventListener('touchmove', function(e) {
-      if (!img || !draggingGuide) return;
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      if (draggingGuide.type === 'vertical') {
-        let newX = x + dragOffset;
-        newX = Math.max(0, Math.min(canvas.width, newX));
-        vGuides[draggingGuide.idx] = newX;
-      } else {
-        let newY = y + dragOffset;
-        newY = Math.max(0, Math.min(canvas.height, newY));
-        hGuides[draggingGuide.idx] = newY;
-      }
-      updateGuideDivs();
-      draw();
-      e.preventDefault(); // Prevent scrolling while dragging
-    });
-
-    window.addEventListener('touchend', function() {
-      draggingGuide = null;
-    });
+                }
+                input[type="file"] {
+                    padding: 1rem 2rem;
+                }
+                
+                button {
+                    font-size: 2.5rem !important;
+                    margin-block: 2rem !important;
+                    margin-right: 2rem !important;
+                    padding: 2rem !important;
+                    margin-left: unset !important;
+                    border-radius: 1rem !important;
+                }
+            }
 
 
-    // Initial blank canvas
-    canvas.width = 600;
-    canvas.height = 400;
-    draw();
-  </script>
-</body>
+
+
+        </style>
+        <!-- JSZip CDN -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    </head>
+    <body>
+        <h2>Image Splitter By Grid</h2>
+        <div id="controls">
+            <input type="file" id="imgInput" accept="image/*" /><br /><br />
+            Vertical Guides:
+            <input
+                type="number"
+                id="vGuides"
+                min="0"
+                max="10"
+                value="2"
+                style="width: 50px"
+            />
+            Horizontal Guides:
+            <input
+                type="number"
+                id="hGuides"
+                min="0"
+                max="10"
+                value="3"
+                style="width: 50px"
+            />
+            <button id="setGuides">Set Guides</button>
+            <button id="splitBtn">Split & Preview</button>
+            <button id="downloadAllBtn" style="display: none">
+                Download All as ZIP
+            </button>
+        </div>
+        <div id="canvasWrapper">
+            <canvas id="imageCanvas"></canvas>
+        </div>
+        <div id="croppedPreviews"></div>
+
+        <script>
+            const imgInput = document.getElementById("imgInput");
+            const vGuidesInput = document.getElementById("vGuides");
+            const hGuidesInput = document.getElementById("hGuides");
+            const setGuidesBtn = document.getElementById("setGuides");
+            const splitBtn = document.getElementById("splitBtn");
+            const downloadAllBtn = document.getElementById("downloadAllBtn");
+            const canvas = document.getElementById("imageCanvas");
+            const ctx = canvas.getContext("2d");
+            const canvasWrapper = document.getElementById("canvasWrapper");
+            const croppedPreviews = document.getElementById("croppedPreviews");
+
+            let img = null;
+            let vGuides = [];
+            let hGuides = [];
+            let draggingGuide = null;
+            let dragOffset = 0;
+            let cropCanvases = [];
+
+            function draw() {
+                if (!img) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                ctx.strokeStyle = "rgba(0,150,255,0.7)";
+                ctx.lineWidth = 2;
+                vGuides.forEach((x) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                });
+                hGuides.forEach((y) => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+
+            function updateGuideDivs() {
+                Array.from(canvasWrapper.querySelectorAll(".guide")).forEach(
+                    (g) => g.remove()
+                );
+                vGuides.forEach((x, idx) => {
+                    const div = document.createElement("div");
+                    div.className = "guide vertical";
+                    div.style.left = x - 1 + "px";
+                    div.style.top = "0px";
+                    div.style.height = canvas.height + "px";
+                    div.dataset.type = "vertical";
+                    div.dataset.idx = idx;
+                    canvasWrapper.appendChild(div);
+                });
+                hGuides.forEach((y, idx) => {
+                    const div = document.createElement("div");
+                    div.className = "guide horizontal";
+                    div.style.top = y - 1 + "px";
+                    div.style.left = "0px";
+                    div.style.width = canvas.width + "px";
+                    div.dataset.type = "horizontal";
+                    div.dataset.idx = idx;
+                    canvasWrapper.appendChild(div);
+                });
+            }
+
+            function setGuides() {
+                let numV = parseInt(vGuidesInput.value) || 0;
+                let numH = parseInt(hGuidesInput.value) || 0;
+                vGuides = [];
+                hGuides = [];
+                for (let i = 1; i <= numV; i++) {
+                    vGuides.push(Math.round((i * canvas.width) / (numV + 1)));
+                }
+                for (let i = 1; i <= numH; i++) {
+                    hGuides.push(Math.round((i * canvas.height) / (numH + 1)));
+                }
+                updateGuideDivs();
+                draw();
+                croppedPreviews.innerHTML = "";
+                downloadAllBtn.style.display = "none";
+            }
+
+            imgInput.addEventListener("change", function () {
+                const file = this.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    img = new window.Image();
+                    img.onload = function () {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        setGuides();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            setGuidesBtn.addEventListener("click", setGuides);
+
+            // Dragging logic for guides
+            canvasWrapper.addEventListener("mousedown", function (e) {
+                if (!img) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                let found = false;
+                vGuides.forEach((gx, idx) => {
+                    if (Math.abs(gx - x) < 5 && !found) {
+                        draggingGuide = { type: "vertical", idx: idx };
+                        dragOffset = gx - x;
+                        found = true;
+                    }
+                });
+                hGuides.forEach((gy, idx) => {
+                    if (Math.abs(gy - y) < 5 && !found) {
+                        draggingGuide = { type: "horizontal", idx: idx };
+                        dragOffset = gy - y;
+                        found = true;
+                    }
+                });
+            });
+
+            canvasWrapper.addEventListener("mousemove", function (e) {
+                if (!img || !draggingGuide) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                if (draggingGuide.type === "vertical") {
+                    let newX = x + dragOffset;
+                    newX = Math.max(0, Math.min(canvas.width, newX));
+                    vGuides[draggingGuide.idx] = newX;
+                } else {
+                    let newY = y + dragOffset;
+                    newY = Math.max(0, Math.min(canvas.height, newY));
+                    hGuides[draggingGuide.idx] = newY;
+                }
+                updateGuideDivs();
+                draw();
+            });
+
+            window.addEventListener("mouseup", function () {
+                draggingGuide = null;
+            });
+
+            function splitAndPreview() {
+                if (!img) return;
+                croppedPreviews.innerHTML = "";
+                cropCanvases = [];
+                const xGuides = [
+                    0,
+                    ...vGuides.slice().sort((a, b) => a - b),
+                    canvas.width,
+                ];
+                const yGuides = [
+                    0,
+                    ...hGuides.slice().sort((a, b) => a - b),
+                    canvas.height,
+                ];
+                let count = 1;
+                for (let i = 0; i < yGuides.length - 1; i++) {
+                    for (let j = 0; j < xGuides.length - 1; j++) {
+                        const sx = xGuides[j],
+                            sy = yGuides[i];
+                        const sw = xGuides[j + 1] - xGuides[j],
+                            sh = yGuides[i + 1] - yGuides[i];
+                        const cropCanvas = document.createElement("canvas");
+                        cropCanvas.width = sw;
+                        cropCanvas.height = sh;
+                        cropCanvas
+                            .getContext("2d")
+                            .drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+                        cropCanvases.push({
+                            canvas: cropCanvas,
+                            name: `crop_${count}.png`,
+                        });
+                        const btn = document.createElement("button");
+                        btn.textContent = "Download";
+                        btn.onclick = function () {
+                            const link = document.createElement("a");
+                            link.download = `crop_${count}.png`;
+                            link.href = cropCanvas.toDataURL("image/png");
+                            link.click();
+                        };
+                        const section = document.createElement("div");
+                        section.className = "cropSection";
+                        section.appendChild(cropCanvas);
+                        section.appendChild(btn);
+                        croppedPreviews.appendChild(section);
+                        count++;
+                    }
+                }
+                if (cropCanvases.length > 0) {
+                    downloadAllBtn.style.display = "";
+                } else {
+                    downloadAllBtn.style.display = "none";
+                }
+            }
+
+            splitBtn.addEventListener("click", splitAndPreview);
+
+            downloadAllBtn.addEventListener("click", async function () {
+                if (!window.JSZip) {
+                    alert("JSZip library not loaded!");
+                    return;
+                }
+                const zip = new JSZip();
+                for (const crop of cropCanvases) {
+                    const blob = await new Promise((resolve) =>
+                        crop.canvas.toBlob(resolve, "image/png")
+                    );
+                    zip.file(crop.name, blob);
+                }
+                zip.generateAsync({ type: "blob" }).then(function (content) {
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(content);
+                    link.download = "cropped_images.zip";
+                    link.click();
+                });
+            });
+
+            // --- Touch support for guides ---
+            canvasWrapper.addEventListener("touchstart", function (e) {
+                if (!img) return;
+                const rect = canvas.getBoundingClientRect();
+                // Use the first touch point only
+                const touch = e.touches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                let found = false;
+                vGuides.forEach((gx, idx) => {
+                    if (Math.abs(gx - x) < 15 && !found) {
+                        draggingGuide = { type: "vertical", idx: idx };
+                        dragOffset = gx - x;
+                        found = true;
+                    }
+                });
+                hGuides.forEach((gy, idx) => {
+                    if (Math.abs(gy - y) < 15 && !found) {
+                        draggingGuide = { type: "horizontal", idx: idx };
+                        dragOffset = gy - y;
+                        found = true;
+                    }
+                });
+                if (found) e.preventDefault(); // Prevent scrolling when touching a guide
+            });
+
+            canvasWrapper.addEventListener("touchmove", function (e) {
+                if (!img || !draggingGuide) return;
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                if (draggingGuide.type === "vertical") {
+                    let newX = x + dragOffset;
+                    newX = Math.max(0, Math.min(canvas.width, newX));
+                    vGuides[draggingGuide.idx] = newX;
+                } else {
+                    let newY = y + dragOffset;
+                    newY = Math.max(0, Math.min(canvas.height, newY));
+                    hGuides[draggingGuide.idx] = newY;
+                }
+                updateGuideDivs();
+                draw();
+                e.preventDefault(); // Prevent scrolling while dragging
+            });
+
+            window.addEventListener("touchend", function () {
+                draggingGuide = null;
+            });
+
+            // Initial blank canvas
+            canvas.width = 600;
+            canvas.height = 400;
+            draw();
+        </script>
+    </body>
 </html>
